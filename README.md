@@ -48,7 +48,7 @@ It will be difficult or impossible to make training work on native Windows. This
 ## Installing
 Clone the repository:
 ```
-git clone --recurse-submodules https://github.com/tdrussell/diffusion-pipe
+git clone --recurse-submodules https://github.com/ThaiLe1220/diffusion-pipe-eu
 ```
 
 If you alread cloned it and forgot to do --recurse-submodules:
