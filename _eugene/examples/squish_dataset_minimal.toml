@@ -1,0 +1,28 @@
+# Ultra-conservative dataset config for maximum memory savings
+# Reduced to 24 frames for minimum RAM usage during caching
+
+# Required resolution parameter
+resolutions = [512]
+
+# Critical for i2v - first frame becomes conditioning  
+video_clip_mode = 'single_beginning'
+
+# Use explicit bucket configuration
+enable_ar_bucket = false
+
+# Minimal resolution buckets - only core 512x512
+ar_buckets = [[512, 512]]  # Only one bucket to minimize memory
+frame_buckets = [24]  # Reduced to 24 frames (30% of original 80)
+
+# Dataset directory configuration
+[[directory]]
+path = "squish_dataset/videos"
+num_repeats = 1
+
+# Template dataset settings  
+caption_extension = ".txt"
+video_extensions = [".mp4"]
+
+# Preprocessing
+center_crop = false
+random_flip = false

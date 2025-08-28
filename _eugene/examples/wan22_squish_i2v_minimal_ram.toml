@@ -1,0 +1,49 @@
+# Memory-optimized configuration for Wan2.2 I2V 14B on RTX 3090 24GB
+# Based on author's wan_14b_min_vram.toml with additional optimizations
+
+output_dir = './training_output/wan22_squish_i2v_minimal'
+dataset = '_eugene/examples/squish_dataset_minimal.toml'
+
+# training settings - ultra conservative
+epochs = 20
+micro_batch_size_per_gpu = 1
+pipeline_stages = 1
+gradient_accumulation_steps = 1
+gradient_clipping = 1
+warmup_steps = 10
+
+# eval settings - minimal eval to save memory
+eval_every_n_epochs = 5  # Less frequent eval
+eval_before_first_step = false  # Skip initial eval
+eval_micro_batch_size_per_gpu = 1
+eval_gradient_accumulation_steps = 1
+
+# misc settings - maximum memory conservation
+save_every_n_epochs = 10
+checkpoint_every_n_minutes = 240
+activation_checkpointing = 'unsloth'
+partition_method = 'parameters'
+save_dtype = 'bfloat16'
+caching_batch_size = 1  # Ultra conservative caching
+steps_per_print = 1
+video_clip_mode = 'single_beginning'
+blocks_to_swap = 36  # More aggressive: swap 36 out of 40 blocks (author uses 32)
+
+[model]
+type = 'wan'
+ckpt_path = '/home/huyai/Desktop/eugene/flixverse/diffusion-pipe-eu/data/models/wan-ai/Wan2.2-I2V-A14B'
+dtype = 'bfloat16'  # Keep author's recommended precision
+transformer_dtype = 'float8_e5m2'  # Most aggressive quantization available
+timestep_sample_method = 'logit_normal'
+
+[adapter]
+type = 'lora'
+rank = 16  # Reduce for memory constraints
+dtype = 'bfloat16'
+
+[optimizer]
+type = 'AdamW8bitKahan'  # 8-bit optimizer for memory savings
+lr = 2e-5
+betas = [0.9, 0.99]
+weight_decay = 0.01
+stabilize = false
