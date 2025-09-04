@@ -89,7 +89,7 @@ ds_pipe_module.PipelineModule._count_layer_params = _count_all_layer_params
 
 def set_config_defaults(config):
     # Force the user to set this. If we made it a default of 1, it might use a lot of disk space.
-    assert 'save_every_n_epochs' in config or 'save_every_n_steps' in config
+    assert 'save_every_n_epochs' in config or 'save_every_n_steps' in config or 'save_every_n_examples' in config
 
     config.setdefault('pipeline_stages', 1)
     config.setdefault('activation_checkpointing', False)
@@ -127,8 +127,10 @@ def set_config_defaults(config):
     config.setdefault('eval_gradient_accumulation_steps', 1)
     config.setdefault('eval_every_n_steps', None)
     config.setdefault('eval_every_n_epochs', None)
+    config.setdefault('eval_every_n_examples', None)
     config.setdefault('eval_before_first_step', True)
     config.setdefault('compile', False)
+    config.setdefault('x_axis_examples', False)
 
 
 def get_most_recent_run_dir(output_dir):
@@ -543,6 +545,13 @@ if __name__ == '__main__':
     global_batch_size = model_engine.train_micro_batch_size_per_gpu() * model_engine.gradient_accumulation_steps() * model_engine.grid.get_data_parallel_world_size()
     print(f'Global batch size = {global_batch_size}')
 
+    if save_every_n_examples := config.pop('save_every_n_examples', None):
+        config['save_every_n_steps'] = save_every_n_examples // global_batch_size
+        print(f"Computed save_every_n_steps = {config['save_every_n_steps']}")
+    if eval_every_n_examples := config.pop('eval_every_n_examples', None):
+        config['eval_every_n_steps'] = eval_every_n_examples // global_batch_size
+        print(f"Computed eval_every_n_steps = {config['eval_every_n_steps']}")
+
     def get_optimizer(model_parameters):
         if len(model_parameters) == 0:
             return DummyOptimizer()
@@ -730,6 +739,7 @@ if __name__ == '__main__':
     model_engine.lr_scheduler = lr_scheduler
 
     step = 1
+    examples = global_batch_size
     # make sure to do this before calling model_engine.set_dataloader(), as that method creates an iterator
     # which starts creating dataloader internal state
     if resume_from_checkpoint:
@@ -745,6 +755,10 @@ if __name__ == '__main__':
         else:
             train_dataloader.load_state_dict(client_state['custom_loader'])
         step = client_state['step'] + 1
+        if 'examples' in client_state:
+            examples = client_state['examples']
+        else:
+            examples = step * global_batch_size
         del client_state
         if is_main_process():
             print(f'Resuming training from checkpoint. Resuming at epoch: {train_dataloader.epoch}, step: {step}')
@@ -779,24 +793,26 @@ if __name__ == '__main__':
         num_steps += 1
         train_dataloader.sync_epoch()
 
-        new_epoch, checkpointed, saved = saver.process_epoch(epoch, step)
+        new_epoch, checkpointed, saved = saver.process_epoch(epoch, step, examples)
         finished_epoch = True if new_epoch != epoch else False
 
+        x_axis = examples if config['x_axis_examples'] else step
+
         if is_main_process() and step % config['logging_steps'] == 0:
-            tb_writer.add_scalar(f'train/loss', loss, step)
+            tb_writer.add_scalar(f'train/loss', loss, x_axis)
             if wandb_enable:
-                wandb.log({'train/loss': loss, 'step': step})
+                wandb.log({'train/loss': loss, 'step': x_axis})
             if optimizer.__class__.__name__ == 'Prodigy':
                 prodigy_d = get_prodigy_d(optimizer)
-                tb_writer.add_scalar(f'train/prodigy_d', prodigy_d, step)
+                tb_writer.add_scalar(f'train/prodigy_d', prodigy_d, x_axis)
             if optimizer.__class__.__name__ in ('Automagic', 'GenericOptim'):
                 lrs, avg_lr = _get_automagic_lrs(optimizer)
                 if avg_lr > 0:
-                    tb_writer.add_histogram(f'train/automagic_lrs', lrs, step)
-                    tb_writer.add_scalar(f'train/automagic_avg_lr', avg_lr, step)
+                    tb_writer.add_histogram(f'train/automagic_lrs', lrs, x_axis)
+                    tb_writer.add_scalar(f'train/automagic_avg_lr', avg_lr, x_axis)
 
         if (config['eval_every_n_steps'] and step % config['eval_every_n_steps'] == 0) or (finished_epoch and config['eval_every_n_epochs'] and epoch % config['eval_every_n_epochs'] == 0):
-            evaluate(model, model_engine, eval_dataloaders, tb_writer, step, config['eval_gradient_accumulation_steps'], disable_block_swap_for_eval)
+            evaluate(model, model_engine, eval_dataloaders, tb_writer, x_axis, config['eval_gradient_accumulation_steps'], disable_block_swap_for_eval)
 
         if finished_epoch:
             if is_main_process():
@@ -810,15 +826,16 @@ if __name__ == '__main__':
                 break
             epoch = new_epoch
 
-        checkpointed, saved = saver.process_step(step)
+        checkpointed, saved = saver.process_step(step, examples)
         if 'max_steps' in config and step >= config['max_steps']:
             final_model_name = f'step{step}'
             break
         step += 1
+        examples += global_batch_size
 
     # Save final training state checkpoint and model, unless we just saved them.
     if not checkpointed:
-        saver.save_checkpoint(step)
+        saver.save_checkpoint(step, examples)
     if not saved:
         saver.save_model(final_model_name)
 

@@ -39,9 +39,15 @@ warmup_steps = 100
 # Block swapping only works for LoRA training, and requires pipeline_stages=1.
 #blocks_to_swap = 20
 
+# Use pseudo Huber loss with constant c. Only works on models that use the default loss function.
+#pseudo_huber_c = 0.5
+
 # eval settings
 
 eval_every_n_epochs = 1
+# You can also specify eval frequency using either of these.
+#eval_every_n_steps = 100
+#eval_every_n_examples = 1000
 eval_before_first_step = true
 # Might want to set these lower for eval so that less images get dropped (eval dataset size is usually much smaller than training set).
 # Each size bucket of images/videos is rounded down to the nearest multiple of the global batch size, so higher global batch size means
@@ -58,6 +64,9 @@ eval_gradient_accumulation_steps = 1
 
 # Probably want to set this a bit higher if you have a smaller dataset so you don't end up with a million saved models.
 save_every_n_epochs = 2
+# You can also specify save frequency using either of these.
+#save_every_n_steps = 100
+#save_every_n_examples = 1000
 # Can checkpoint the training state every n number of epochs or minutes. Set only one of these. You can resume from checkpoints using the --resume_from_checkpoint flag.
 #checkpoint_every_n_epochs = 1
 checkpoint_every_n_minutes = 120
@@ -99,6 +108,9 @@ steps_per_print = 1
 # multiple_overlapping: extract the minimum number of clips to cover the full range of the video. They might overlap some.
 # default is single_beginning
 video_clip_mode = 'single_beginning'
+
+# By default, the loss graphs in Tensorboard / WandB have step as the x-axis. You can change it to number of examples seen instead.
+#x_axis_examples = true
 
 # This is how you configure HunyuanVideo. Other models will be different. See docs/supported_models.md for
 # details on the configuration and options for each model.
