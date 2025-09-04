@@ -1,0 +1,31 @@
+# Dataset configuration for private_jet_256p
+# Generated from dataset with 15 videos
+# Description coverage: 15/15 videos
+
+# Detected resolutions: [[256, 352], [256, 456], [256, 454], [256, 436], [256, 448], [256, 380]]
+# Average FPS: 16.0
+# Frame counts: 81-81 (avg: 81)
+
+# Resolution settings
+resolutions = [256]
+
+# Video processing settings
+video_clip_mode = 'single_beginning'
+enable_ar_bucket = true
+
+# Bucket configuration
+ar_buckets = [[256, 256]]
+frame_buckets = [81]
+
+# Dataset directory
+[[directory]]
+path = "data/datasets/private_jet_256p"
+num_repeats = 1
+
+# File extensions
+caption_extension = ".txt"
+video_extensions = ['.mp4']
+
+# Preprocessing options
+center_crop = false
+random_flip = false
